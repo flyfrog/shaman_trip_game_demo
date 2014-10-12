@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>p2.js Platformer example</title>
+    <meta charset="utf-8">
+    <script src="js/p2.js"></script>
+  </head>
+  <body>
+
+    <!-- The canvas, where we draw stuff -->
+    <canvas width="900" height="600" id="myCanvas"></canvas>
+
+    <p id="eva">Use arrow keys to control character</p>
+
+    <script>
+var D = function(x){return document.getElementById(x);}    
+      var canvas, ctx, w, h, zoom=50, jumpSpeed=6, walkSpeed=3,
+          world, characterBody, planeBody, platforms=[], boxes=[],fruct=[];
+ 
+var res  = {}; // все картинки тут
+var suma = {};
+suma.bag = [];
+function load_img(){//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+res.img_pers_run = [];
+for(var t =0;t<=6;t++){ // загрузка картинок на бег
+  res.img_pers_run[t] = new Image();
+  res.img_pers_run[t].src = "img/ra/a"+t+".png";
+}
+
+res.ground = new Image();
+res.ground.src = "img/gr/gr2.jpg";
+
+res.box_img = new Image();
+res.box_img.src = "img/box/box.png";
+
+
+res.fruct_img = new Image();
+res.fruct_img.src = "img/fruct/apple.png";
+
+}//load_img %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+load_img(); 
+
+
+      var buttons = {
+        space : false,
+        left :  false,
+        right : false,
+      }
+
+var ja = {}; // пресонаж
+
+ja.height  = 1.5; //высота шамана
+ja.width = 1; // ширина
+ja.wa = 0;      //направление взгляда
+ja.smena = 0; // разрешение на смену фрейма бега 0 - да
+ja.skid = 0; // счетк до смены
+ja.now_skid = 3; // максимальное вреся
+
+
+
+  
+
+function clock(){
+if(ja.smena==1){
+  if(ja.skid>0){ja.skid--;}else{ja.smena=0;}
+}
+}//clock ejd
+
+
+
+function main(){
+      init();
+      animate();
+      setInterval(clock,20);
+}//end main
+ 
+setTimeout(main,100);
+      function init(){
+
+        // Init canvas
+        canvas = document.getElementById("myCanvas");
+        w = canvas.width;
+        h = canvas.height;
+        ctx = canvas.getContext("2d");
+        ctx.lineWidth = 1/zoom;
+
+        // Init world
+        world = new p2.World();
+
+        world.defaultContactMaterial.friction = 0.5;
+        world.setGlobalStiffness(1e5);
+
+        // Init materials
+        var groundMaterial = new p2.Material(),
+            characterMaterial = new p2.Material(),
+            boxMaterial = new p2.Material();
+
+        // Add a character body
+        characterShape = new p2.Rectangle(ja.width,ja.height);
+        ja.b = new p2.Body({
+          mass: 1,
+          position:[0,3],
+          fixedRotation: true,
+
+        });
+
+//:::::::::::::::::::::::::::::::::::::::::
+ja.b.addShape(characterShape);
+world.addBody(ja.b);
+characterShape.material = characterMaterial;
+
+ja.b.damping = 0.1;
+ja.fr  = 0;
+ja.b.img = res.img_pers_run[ja.fr];
+ja.b.angle = 3.14;
+ja.b.id_ = "ja";
+
+
+
+
+// Add a ground plane:::::::::::::::::::::::::::
+        planeShape = new p2.Plane();
+        planeBody = new p2.Body({
+        position:[0,-1]
+        });
+        planeBody.addShape(planeShape);
+        world.addBody(planeBody);
+        planeShape.material = groundMaterial;
+
+// Add platforms:::::::::::::::::::::::::::::::::::::::::
+        var platformPositions = [[2,0],[0,1],[-2,2],[-2,5],[-5,2],[6,2]],
+            platformShape = new p2.Rectangle(1,0.3);
+        for(var i=0; i<platformPositions.length; i++){
+          var platformBody = new p2.Body({
+            mass: 0, // Static
+            position:platformPositions[i],
+          });
+          platformBody.type = p2.Body.KINEMATIC;
+          platformBody.addShape(platformShape);
+          world.addBody(platformBody);
+          platforms.push(platformBody);
+        }
+        platformShape.material = groundMaterial;
+
+// Add movable boxes :::::::::::::::::::::::::::::::::::::::::::
+var boxPositions = [[-4,1],[-4,2],[-2,3],[-2,5],[4,6],[2,1],[2,1],[2,1]],
+boxShape = new p2.Rectangle(1,1);
+        for(var i=0; i<boxPositions.length; i++){
+          var boxBody = new p2.Body({
+            mass: 1,
+            position:boxPositions[i],
+          });
+          boxBody.addShape(boxShape);
+          boxBody.img = res.box_img;
+          boxBody.id_ = "$"+i;
+
+          world.addBody(boxBody);
+
+          boxes.push(boxBody);
+        }//for
+boxShape.material = boxMaterial;
+//___________________________________________
+//Add fruct
+var fructPositions = [[-4,16],[-2,16],[2,16],[-2,16],[4,16],[2,18],[5,19],[3,11],[3,31],[3,21]],
+fructShape = new p2.Circle(0.3);
+        for(var i=0; i<fructPositions.length; i++){
+          var fructBody = new p2.Body({
+            mass: 1,
+            position:fructPositions[i],
+          });
+          fructBody.addShape(fructShape);
+          fructBody.img = res.fruct_img;
+          fructBody.id_ = "apple"+i;
+          fructBody.class_ = "apple";
+          world.addBody(fructBody);
+
+          fruct.push(fructBody);
+        }//for
+fructShape.material = boxMaterial;
+
+
+
+
+
+// Init contactmaterials
+        var groundCharacterCM = new p2.ContactMaterial(groundMaterial, characterMaterial,{
+          friction : 0, // No friction between character and ground
+        });
+        var boxCharacterCM = new p2.ContactMaterial(boxMaterial, characterMaterial,{
+          friction : 0, // No friction between character and boxes
+        });
+        var boxGroundCM = new p2.ContactMaterial(boxMaterial, groundMaterial,{
+          friction : 0.6, // Between boxes and ground
+        });
+        world.addContactMaterial(groundCharacterCM);
+        world.addContactMaterial(boxCharacterCM);
+        world.addContactMaterial(boxGroundCM);
+
+ 
+
+      }//end init 
+
+function drawBox(body){
+        ctx.beginPath();
+        var x = body.position[0],
+            y = body.position[1],
+            s = body.shapes[0];
+        ctx.save();
+        ctx.translate(x, y);     // Translate to the center of the box
+        ctx.rotate(body.angle);  // Rotate to the box body frame
+        if(typeof(body.img)=="undefined"){
+        ctx.fillRect(-s.width/2, -s.height/2, s.width, s.height);
+      }else{
+
+      draw_img(body,x,y,s);
+      }
+        ctx.restore();
+}//end drawBox
+
+
+function drawCircle(body){
+        ctx.beginPath();
+        var x = body.position[0],
+            y = body.position[1],
+            s = body.shapes[0];
+        ctx.save();
+        ctx.translate(x, y);     // Translate to the center of the box
+        ctx.rotate(body.angle);  // Rotate to the box body frame
+        if(typeof(body.img)=="undefined"){
+       ctx.arc(0, 0, s.radius, 0, 2*Math.PI);
+       ctx.fillStyle='red';
+       ctx.fill();
+      }else{
+       ctx.drawImage(body.img,-s.radius,-s.radius,s.radius*2,s.radius*2);
+      }
+        ctx.restore();
+}//end drawBox
+
+//^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+function draw_img(body,x,y,s){//^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+// персонаж
+
+if(typeof(body.id_)=="undefined"){
+ ctx.drawImage(body.img,-s.width/2, -s.height/2, s.width, s.height);
+}else{//для простых
+
+if(body.id_=="ja"){ 
+if(ja.wa==1)ctx.scale(-1, 1); // код шамана
+ctx.drawImage(body.img,-s.width/2, -s.height/2, s.width, s.height+0.1);
+}//конец кода щамана
+
+if(body.id_!="ja"){  
+ctx.drawImage(body.img,-s.width/2, -s.height/2, s.width, s.height);
+}
+
+}//ELSE
+
+}//draw_img ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+//^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+var space = 1;
+function draw_suma(i){//^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 
+var x = space*i-9;
+D("eva").innerHTML = suma.bag.length;
+ 
+      // Translate to the center of the box
+ ctx.drawImage(res.fruct_img,x,5, 1, 1); 
+
+
+
+
+}//suma end
+
+
+function drawPlane(){ //PLAN ******************************************
+        var y1 = planeBody.position[1],
+            y0 = -h/zoom/2,
+            x0 = -w/zoom/2,
+            x1 = w/zoom/2;
+       // ctx.fillRect(x0, y0, x1-x0, y1-y0);
+        ctx.drawImage(res.ground,x0, y0, x1-x0, y1-y0);
+}//end drawPlan ***********************************************************
+
+function render(){//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+// обнудение 
+suma.position = 0 ;
+
+
+        ctx.clearRect(0,0,w,h);
+ 
+        ctx.save();
+        ctx.translate(w/2, h/2);  // Translate to the center
+        ctx.scale(zoom, -zoom);   // Zoom in and flip y axis
+
+        // Draw all bodies
+        ctx.strokeStyle='none';
+
+        ctx.fillStyle='green';
+        drawPlane();
+        for(var i=0; i<platforms.length; i++){
+          drawBox(platforms[i]);
+        }
+
+        ctx.fillStyle='red';
+        drawBox(ja.b);
+        for(var i=0; i<boxes.length; i++){
+          drawBox(boxes[i]);
+        }
+
+
+           for(var i=0; i<fruct.length; i++){
+          drawCircle(fruct[i]);
+        }
+
+if(suma.bag.length>0){
+        for(var i = 0; i<suma.bag.length;i++){
+
+          draw_suma( i);
+
+        }//for
+      }//if
+
+
+        // Restore transform
+        ctx.restore();
+
+}//end  render $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+
+ 
+
+
+
+
+//*************************************************************************
+function animate(t){ //------------------------------------
+t = t || 0;
+requestAnimationFrame(animate);
+
+for(var i=0; i<platforms.length; i++){ //подвижные платформы
+platforms[i].velocity[0] = Math.sin(t*0.001);
+}
+
+if(buttons.right){ //right------------------------------
+
+ja.b.velocity[0] =  walkSpeed;
+ja.wa=1;
+frame_x (1);
+
+}else{ //right -------------------------------------
+if(buttons.left){//left-----------------------------
+
+ja.b.velocity[0] = -walkSpeed;
+ja.wa=-1;
+frame_x (-1); 
+
+}else{// left---------------------------------------
+  //no----------------------------------------------
+
+ja.b.velocity[0] = 0; frame_x (0);
+
+}//if no -----------------------------------------
+}//if end
+
+collison_on();
+world.step(1/60);
+render();
+}//end animate ********************************************************************
+
+ 
+
+
+function collison_on(){
+ 
+for(var i=0; i<world.narrowphase.contactEquations.length; i++){
+var c = world.narrowphase.contactEquations[i];
+
+if(typeof(c.bodyA.id_)!="undefined"&&typeof(c.bodyB.id_)!="undefined"){
+var A =c.bodyA.id_;
+var B = c.bodyB.id_;
+var AA =c.bodyA;
+var BB = c.bodyB;
+
+
+
+if(A=="ja"&&typeof(BB.class_)!="undefined"){ 
+
+if(BB.class_=="apple"){delite_by_id(fruct,B); suma.bag.push("apple");}
+ 
+ }   //if A
+
+if(B=="ja"&&typeof(AA.class_)!="undefined"){ 
+alert();
+if(AA.class_=="apple"){delite_by_id(fruct,A); suma.bag.push("apple");}
+
+ }//if B
+
+ 
+}//if -----------
+
+}//for
+
+}//end collision
+function delite_by_id(ar,id){
+
+for(var i=0; i<ar.length;i++){
+if(id == ar[i].id_){
+world.removeBody(ar[i]);
+ar.splice(i,1);
+return 1;
+}//if
+}//for
+return - 1;
+}//delite end
+
+
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+      var yAxis = p2.vec2.fromValues(0,1);
+function checkIfCanJump(){
+var result = false;
+        for(var i=0; i<world.narrowphase.contactEquations.length; i++){
+
+var c = world.narrowphase.contactEquations[i];
+
+if(typeof(c.bodyA.id_)!="undefined"&&typeof(c.bodyB.id_)!="undefined"){
+//D("eva").innerHTML = "A"+c.bodyA.id_+"----"+c.bodyB.id_;
+
+
+}else{
+//  D("eva").innerHTML = "A" ;
+}
+
+          if(c.bodyA === ja.b || c.bodyB === ja.b){//if ##
+
+
+            var d = p2.vec2.dot(c.normalA, yAxis); // Normal dot Y-axis
+            if(c.bodyA === ja.b) d *= -1;
+            if(d > 0.5) result = true;
+          
+          }//if ##
+        }//FOR
+return result;
+}
+
+
+
+      window.onkeydown = function(event){
+        switch(event.keyCode){
+          case 38: // up
+          case 32: // space
+            if(!buttons.space){
+              if(checkIfCanJump()) ja.b.velocity[1] = jumpSpeed;
+              buttons.space = true;
+            }
+            break;
+          case 39: // right
+            buttons.right = true;
+            break;
+          case 37: // left
+            buttons.left = true;
+            break;
+        }
+      }
+
+      window.onkeyup = function(event){
+        switch(event.keyCode){
+          case 38: // up
+          case 32: // space
+            buttons.space = false;
+            break;
+          case 39: // right
+            buttons.right = false;
+            break;
+          case 37: // left
+            buttons.left = false;
+            break;
+        }
+      }//key
+
+function frame_x (x){ // - ---------------------------------
+if(ja.smena==0&&checkIfCanJump()==true){
+if(x==1){
+ 
+            ja.smena=1; ja.skid = ja.now_skid;
+            if(ja.fr<6){ ja.fr++;}else{ja.fr=0;}
+            ja.b.img = res.img_pers_run[ja.fr];
+   
+}//1 вправо
+
+if(x==-1){
+
+            ja.smena=1; ja.skid = ja.now_skid;
+            if(ja.fr>0){ ja.fr--;}else{ja.fr=6;}
+            ja.b.img = res.img_pers_run[ja.fr];
+  
+}//1 влево
+}//он на земле, и есть пауза между фреймами
+
+
+
+if(x==0){//в прыжке фреймы не меняются
+ja.fr=0; 
+ja.b.img = res.img_pers_run[ja.fr]; // фрейм прыжка
+}// 0
+
+
+}//frame x _________________________________________________________________
+
+
+    </script>
+
+  </body>
+</html>
