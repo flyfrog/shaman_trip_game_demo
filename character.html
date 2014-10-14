@@ -4,6 +4,23 @@
     <title>p2.js Platformer example</title>
     <meta charset="utf-8">
     <script src="js/p2.js"></script>
+    <script src="js/draw.js"></script>
+    <script src="js/render.js"></script>
+    <script src="js/init.js"></script>
+ <style type="text/css">
+body{
+ 
+
+}
+
+canvas {
+  position: absolute;
+  left: 0px; bottom: 0px;
+
+    width:100%;
+    height: 100%;
+}
+</style>
   </head>
   <body>
 
@@ -14,12 +31,31 @@
 
     <script>
 var D = function(x){return document.getElementById(x);}    
-      var canvas, ctx, w, h, zoom=50, jumpSpeed=6, walkSpeed=3,
+function gr(g){ return g* (Math.PI/180)*-1;}
+function ran(x){return Math.round(Math.random()*x);}
+ 
+ 
+
+      var canvas, ctx, w, h, zoom=34, jumpSpeed=7, walkSpeed=4,
           world, characterBody, planeBody, platforms=[], boxes=[],fruct=[];
  
+var win = {}; 
 var res  = {}; // все картинки тут
 var suma = {};
 suma.bag = [];
+
+var ground = {};
+ground.x=-40;ground.y=0;
+ground.w=70;ground.h=6;
+
+var les  = []; // все деревья тут//и растения 
+
+var concaveBody;
+var lineBody=0;
+
+
+
+
 function load_img(){//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 res.img_pers_run = [];
 for(var t =0;t<=6;t++){ // загрузка картинок на бег
@@ -37,9 +73,35 @@ res.box_img.src = "img/box/box.png";
 res.fruct_img = new Image();
 res.fruct_img.src = "img/fruct/apple.png";
 
+res.les = [];
+for(var i=0; i<=13;i++){
+res.les[i] = new Image();
+res.les[i].src = "img/flora/tree/tree"+i+".png";
+}//for
+fabrica_lesa(30);
+
+
 }//load_img %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 load_img(); 
 
+
+function fabrica_lesa(x){
+
+for(var r=0; r<x;r++){
+les[r] = {};
+les[r].x = ran(60)-30;
+les[r].y = 4;
+les[r].h = 5;
+les[r].w = 3;
+les[r].img =  res.les[ran(res.les.length-1)];
+}//end for
+}//end fabrica_lesa
+//******************************************************************************
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//******************************************************************************
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//******************************************************************************
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
       var buttons = {
         space : false,
@@ -49,17 +111,19 @@ load_img();
 
 var ja = {}; // пресонаж
 
-ja.height  = 1.5; //высота шамана
-ja.width = 1; // ширина
+ja.height  = 2; //высота шамана
+ja.width = 1.3; // ширина
 ja.wa = 0;      //направление взгляда
 ja.smena = 0; // разрешение на смену фрейма бега 0 - да
 ja.skid = 0; // счетк до смены
 ja.now_skid = 3; // максимальное вреся
+ja.x=0;
+ja.y=0;
 
 
-
+// поправки в 3 функциях
+// drawBox,drawCircle,drawPlan
   
-
 function clock(){
 if(ja.smena==1){
   if(ja.skid>0){ja.skid--;}else{ja.smena=0;}
@@ -75,270 +139,63 @@ function main(){
 }//end main
  
 setTimeout(main,100);
-      function init(){
-
-        // Init canvas
-        canvas = document.getElementById("myCanvas");
-        w = canvas.width;
-        h = canvas.height;
-        ctx = canvas.getContext("2d");
-        ctx.lineWidth = 1/zoom;
-
-        // Init world
-        world = new p2.World();
-
-        world.defaultContactMaterial.friction = 0.5;
-        world.setGlobalStiffness(1e5);
-
-        // Init materials
-        var groundMaterial = new p2.Material(),
-            characterMaterial = new p2.Material(),
-            boxMaterial = new p2.Material();
-
-        // Add a character body
-        characterShape = new p2.Rectangle(ja.width,ja.height);
-        ja.b = new p2.Body({
-          mass: 1,
-          position:[0,3],
-          fixedRotation: true,
-
-        });
-
-//:::::::::::::::::::::::::::::::::::::::::
-ja.b.addShape(characterShape);
-world.addBody(ja.b);
-characterShape.material = characterMaterial;
-
-ja.b.damping = 0.1;
-ja.fr  = 0;
-ja.b.img = res.img_pers_run[ja.fr];
-ja.b.angle = 3.14;
-ja.b.id_ = "ja";
-
-
-
-
-// Add a ground plane:::::::::::::::::::::::::::
-        planeShape = new p2.Plane();
-        planeBody = new p2.Body({
-        position:[0,-1]
-        });
-        planeBody.addShape(planeShape);
-        world.addBody(planeBody);
-        planeShape.material = groundMaterial;
-
-// Add platforms:::::::::::::::::::::::::::::::::::::::::
-        var platformPositions = [[2,0],[0,1],[-2,2],[-2,5],[-5,2],[6,2]],
-            platformShape = new p2.Rectangle(1,0.3);
-        for(var i=0; i<platformPositions.length; i++){
-          var platformBody = new p2.Body({
-            mass: 0, // Static
-            position:platformPositions[i],
-          });
-          platformBody.type = p2.Body.KINEMATIC;
-          platformBody.addShape(platformShape);
-          world.addBody(platformBody);
-          platforms.push(platformBody);
-        }
-        platformShape.material = groundMaterial;
-
-// Add movable boxes :::::::::::::::::::::::::::::::::::::::::::
-var boxPositions = [[-4,1],[-4,2],[-2,3],[-2,5],[4,6],[2,1],[2,1],[2,1]],
-boxShape = new p2.Rectangle(1,1);
-        for(var i=0; i<boxPositions.length; i++){
-          var boxBody = new p2.Body({
-            mass: 1,
-            position:boxPositions[i],
-          });
-          boxBody.addShape(boxShape);
-          boxBody.img = res.box_img;
-          boxBody.id_ = "$"+i;
-
-          world.addBody(boxBody);
-
-          boxes.push(boxBody);
-        }//for
-boxShape.material = boxMaterial;
-//___________________________________________
-//Add fruct
-var fructPositions = [[-4,16],[-2,16],[2,16],[-2,16],[4,16],[2,18],[5,19],[3,11],[3,31],[3,21]],
-fructShape = new p2.Circle(0.3);
-        for(var i=0; i<fructPositions.length; i++){
-          var fructBody = new p2.Body({
-            mass: 1,
-            position:fructPositions[i],
-          });
-          fructBody.addShape(fructShape);
-          fructBody.img = res.fruct_img;
-          fructBody.id_ = "apple"+i;
-          fructBody.class_ = "apple";
-          world.addBody(fructBody);
-
-          fruct.push(fructBody);
-        }//for
-fructShape.material = boxMaterial;
 
 
 
 
 
-// Init contactmaterials
-        var groundCharacterCM = new p2.ContactMaterial(groundMaterial, characterMaterial,{
-          friction : 0, // No friction between character and ground
-        });
-        var boxCharacterCM = new p2.ContactMaterial(boxMaterial, characterMaterial,{
-          friction : 0, // No friction between character and boxes
-        });
-        var boxGroundCM = new p2.ContactMaterial(boxMaterial, groundMaterial,{
-          friction : 0.6, // Between boxes and ground
-        });
-        world.addContactMaterial(groundCharacterCM);
-        world.addContactMaterial(boxCharacterCM);
-        world.addContactMaterial(boxGroundCM);
 
- 
+function gora_gen(cal){
+var ar = [];
+var rest  = 0;
+for(var i=0;i<cal;i++){
+var x = rest, y=rest;
+rest+=0.1;
+ar[i] = [x,y];
 
-      }//end init 
-
-function drawBox(body){
-        ctx.beginPath();
-        var x = body.position[0],
-            y = body.position[1],
-            s = body.shapes[0];
-        ctx.save();
-        ctx.translate(x, y);     // Translate to the center of the box
-        ctx.rotate(body.angle);  // Rotate to the box body frame
-        if(typeof(body.img)=="undefined"){
-        ctx.fillRect(-s.width/2, -s.height/2, s.width, s.height);
-      }else{
-
-      draw_img(body,x,y,s);
-      }
-        ctx.restore();
-}//end drawBox
-
-
-function drawCircle(body){
-        ctx.beginPath();
-        var x = body.position[0],
-            y = body.position[1],
-            s = body.shapes[0];
-        ctx.save();
-        ctx.translate(x, y);     // Translate to the center of the box
-        ctx.rotate(body.angle);  // Rotate to the box body frame
-        if(typeof(body.img)=="undefined"){
-       ctx.arc(0, 0, s.radius, 0, 2*Math.PI);
-       ctx.fillStyle='red';
-       ctx.fill();
-      }else{
-       ctx.drawImage(body.img,-s.radius,-s.radius,s.radius*2,s.radius*2);
-      }
-        ctx.restore();
-}//end drawBox
-
-//^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-function draw_img(body,x,y,s){//^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-// персонаж
-
-if(typeof(body.id_)=="undefined"){
- ctx.drawImage(body.img,-s.width/2, -s.height/2, s.width, s.height);
-}else{//для простых
-
-if(body.id_=="ja"){ 
-if(ja.wa==1)ctx.scale(-1, 1); // код шамана
-ctx.drawImage(body.img,-s.width/2, -s.height/2, s.width, s.height+0.1);
-}//конец кода щамана
-
-if(body.id_!="ja"){  
-ctx.drawImage(body.img,-s.width/2, -s.height/2, s.width, s.height);
 }
 
-}//ELSE
 
-}//draw_img ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-//^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+return ar;
+}
+
+
+
+
+
+
 
 var space = 1;
 function draw_suma(i){//^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
  
-var x = space*i-9;
-D("eva").innerHTML = suma.bag.length;
+var x = space*i-win.lx;
  
-      // Translate to the center of the box
- ctx.drawImage(res.fruct_img,x,5, 1, 1); 
-
-
-
+ctx.drawImage(res.fruct_img,x,win.ly-1, 1, 1); 
 
 }//suma end
 
 
 function drawPlane(){ //PLAN ******************************************
-        var y1 = planeBody.position[1],
-            y0 = -h/zoom/2,
-            x0 = -w/zoom/2,
-            x1 = w/zoom/2;
-       // ctx.fillRect(x0, y0, x1-x0, y1-y0);
-        ctx.drawImage(res.ground,x0, y0, x1-x0, y1-y0);
+        var y = planeBody.position[1]-ja.y,
+            x = ground.x-ja.x,
+            w = ground.w,
+            h = ground.h; 
+  
+ctx.drawImage(res.ground,x, y-h+0.3, w, h);
+
 }//end drawPlan ***********************************************************
 
-function render(){//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-// обнудение 
-suma.position = 0 ;
 
-
-        ctx.clearRect(0,0,w,h);
- 
-        ctx.save();
-        ctx.translate(w/2, h/2);  // Translate to the center
-        ctx.scale(zoom, -zoom);   // Zoom in and flip y axis
-
-        // Draw all bodies
-        ctx.strokeStyle='none';
-
-        ctx.fillStyle='green';
-        drawPlane();
-        for(var i=0; i<platforms.length; i++){
-          drawBox(platforms[i]);
-        }
-
-        ctx.fillStyle='red';
-        drawBox(ja.b);
-        for(var i=0; i<boxes.length; i++){
-          drawBox(boxes[i]);
-        }
-
-
-           for(var i=0; i<fruct.length; i++){
-          drawCircle(fruct[i]);
-        }
-
-if(suma.bag.length>0){
-        for(var i = 0; i<suma.bag.length;i++){
-
-          draw_suma( i);
-
-        }//for
-      }//if
-
-
-        // Restore transform
-        ctx.restore();
-
-}//end  render $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
  
-
-
-
-
 //*************************************************************************
 function animate(t){ //------------------------------------
 t = t || 0;
 requestAnimationFrame(animate);
 
 for(var i=0; i<platforms.length; i++){ //подвижные платформы
-platforms[i].velocity[0] = Math.sin(t*0.001);
+//platforms[i].velocity[0] = Math.sin(t*0.001);
 }
 
 if(buttons.right){ //right------------------------------
@@ -360,8 +217,13 @@ frame_x (-1);
 ja.b.velocity[0] = 0; frame_x (0);
 
 }//if no -----------------------------------------
+
+
 }//if end
 
+ja.x  = ja.b.position[0];
+ja.y  = ja.b.position[1]+2;
+D("eva").innerHTML= ja.x;
 collison_on();
 world.step(1/60);
 render();
@@ -382,7 +244,6 @@ var AA =c.bodyA;
 var BB = c.bodyB;
 
 
-
 if(A=="ja"&&typeof(BB.class_)!="undefined"){ 
 
 if(BB.class_=="apple"){delite_by_id(fruct,B); suma.bag.push("apple");}
@@ -390,10 +251,10 @@ if(BB.class_=="apple"){delite_by_id(fruct,B); suma.bag.push("apple");}
  }   //if A
 
 if(B=="ja"&&typeof(AA.class_)!="undefined"){ 
-alert();
+ 
 if(AA.class_=="apple"){delite_by_id(fruct,A); suma.bag.push("apple");}
 
- }//if B
+}//if B
 
  
 }//if -----------
